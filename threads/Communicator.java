@@ -10,6 +10,13 @@ import nachos.machine.*;
  * threads can be paired off at this point.
  */
 public class Communicator {
+    
+    Int Message;
+    Boolean wordSpoken;
+    Condition2 speaker;
+    Condition2 listener;
+    Lock lock;
+
     /**
      * Allocate a new communicator.
      */
