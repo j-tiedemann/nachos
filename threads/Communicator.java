@@ -1,4 +1,5 @@
 package nachos.threads;
+import java.util.Timer;
 
 import nachos.machine.*;
 
@@ -26,7 +27,7 @@ public class Communicator {
         lock = new Lock();
         speaker = new Condition(lock);
         listener = new Condition(lock);
-        wordSpoken = true;
+        wordSpoken = false;
         numListners = 0;
     }
 
@@ -43,12 +44,12 @@ public class Communicator {
     public void speak(int word) {
         lock.acquire();
 
-        while(numListners == 0 || (!wordSpoken)) {
+        while(numListners == 0 || wordSpoken) {
             speaker.sleep();
     
         }
 
-        wordSpoken = false;
+        wordSpoken = true;
         message = word;
         listener.wake();
         lock.release();
@@ -69,39 +70,45 @@ public class Communicator {
         listener.sleep();
 
         int wordTransfer = message;
-        wordSpoken = true;
+        wordSpoken = false;
 
         numListners--;
+        speaker.wake();
         lock.release();
         return wordTransfer;
 
     }
 
     public static void selfTest(){
+        Lib.debug(CommunicatorTestChar, "-----------------------");
         Lib.debug(CommunicatorTestChar, "Comuincator test case");
 
 		basicTest();
-        testTest();
+        multipleSpeakers();
+        multipleListeners();
+        performanceTest();
+
+        Lib.debug(CommunicatorTestChar, "-----------------------");
     
     }
 
     public static void basicTest() {
-        final Communicator cTest = new Communicator();
+        final Communicator comTest = new Communicator();
 
 		//Test case 1
-		KThread test1a = new KThread(new Runnable(){
+		KThread speakerThread = new KThread(new Runnable(){
 			public void run(){
 				Lib.debug(CommunicatorTestChar, "Test Case 1: basic test one speaker and lisitner.");
 				Lib.debug(CommunicatorTestChar, "Sending message 15");
-				cTest.speak(15);
+				comTest.speak(15);
 			}
 		});
 
-		test1a.fork();
+		speakerThread.fork();
 
-		KThread test1b = new KThread(new Runnable(){
+		KThread listenThread = new KThread(new Runnable(){
 			public void run(){
-				int result = cTest.listen();
+				int result = comTest.listen();
 				Lib.debug(CommunicatorTestChar, "" + result);
 				if(result == 15)
 					Lib.debug(CommunicatorTestChar, "Test 1 Successful! Message " + result + " received.\n");
@@ -110,38 +117,199 @@ public class Communicator {
 			}
 		});
 
-		test1b.fork();
-		test1b.join();
-		test1a.join();
+		listenThread.fork();
+		listenThread.join();
+		speakerThread.join();
+		Lib.debug(CommunicatorTestChar, "-----------------------");
     }
     
-    public static void testTest(){
-        final Communicator cTest = new Communicator();
-      
-		//Test case 1
-		KThread test1a = new KThread(new Runnable(){
+    public static void multipleSpeakers() {
+
+        Lib.debug(CommunicatorTestChar, "Test 2: multiple speakers ");
+    	//Create a Communicator object
+    	final Communicator multiSpeakerCom = new Communicator();
+       
+    	
+    	//Create 5 speakers that each will speak a word (1-5) when they are forked
+    	KThread speaker1 = new KThread(new Runnable(){
 			public void run(){
-                System.out.println("Test Case 1: basic test one speaker and lisitner.");
-                System.out.println("Sending message 15");
-				cTest.speak(15);
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
+				multiSpeakerCom.speak(1);
 			}
 		});
 
-		test1a.fork();
-
-		KThread test1b = new KThread(new Runnable(){
+        KThread speaker2 = new KThread(new Runnable(){
 			public void run(){
-				int result = cTest.listen();
-                System.out.println(result);
-				if(result == 15)
-                    System.out.println("Test 1 Successful! Message " + result + " received.\n");
-				else
-                    System.out.println("Test 1 Failed.\n");
+				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
+				multiSpeakerCom.speak(2);
 			}
 		});
 
-		test1b.fork();
-		test1b.join();
-		test1a.join();
+        KThread speaker3 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
+				multiSpeakerCom.speak(3);
+			}
+		});
+    	
+        KThread listen1 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listen 1: recived:" + multiSpeakerCom.listen());
+			}
+		});
+
+        KThread listen2 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listen 2: recived:" + multiSpeakerCom.listen());
+			}
+		});
+
+        KThread listen3 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listen 3: recived:" + multiSpeakerCom.listen());
+			}
+		});
+
+        speaker1.fork();
+        speaker2.fork();
+        speaker3.fork();
+        listen1.fork();
+        listen2.fork();
+        listen3.fork();
+
+        speaker1.join();
+        speaker2.join();
+        speaker3.join();
+     
+        Lib.debug(CommunicatorTestChar, "Test 2 Successful");
+        Lib.debug(CommunicatorTestChar, "-----------------------");
+
+    }
+    
+    public static void multipleListeners() {
+
+        Lib.debug(CommunicatorTestChar, "Test 3: multiple listners ");
+
+        final Communicator multiSpeakerCom = new Communicator();
+
+        KThread listen1 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listener 1: ready to listen ");
+    			Lib.debug(CommunicatorTestChar, "listener1 recived word: " 
+    												+ multiSpeakerCom.listen() + ".");
+			}
+		});
+
+        KThread listen2 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listener 2: ready to listen ");
+    			Lib.debug(CommunicatorTestChar, "listener2 recived word: " 
+    												+ multiSpeakerCom.listen() + ".");
+			}
+		});
+
+        KThread listen3 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "listener 2: ready to listen ");
+    			Lib.debug(CommunicatorTestChar, "listener2 recived word: " 
+    												+ multiSpeakerCom.listen() + ".");
+			}
+		});
+
+
+        KThread speaker1 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
+				multiSpeakerCom.speak(1);
+			}
+		});
+
+        KThread speaker2 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
+				multiSpeakerCom.speak(2);
+			}
+		});
+
+        KThread speaker3 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
+				multiSpeakerCom.speak(3);
+			}
+		});
+
+        listen1.fork();
+        listen2.fork();
+        listen3.fork();
+        speaker1.fork();
+        speaker2.fork();
+        speaker3.fork();
+        
+        listen1.join();
+     
+        listen2.join();
+        
+        listen3.join();
+        Lib.debug(CommunicatorTestChar, "Test 3 Successful");
+        Lib.debug(CommunicatorTestChar, "-----------------------");
+
+    }
+    public static void performanceTest() {
+    	
+    	long start = System.currentTimeMillis();
+    	
+        Lib.debug(CommunicatorTestChar, "Test 4: Performance test ");
+        Lib.debug(CommunicatorTestChar, "Starting timer");
+   
+    	//Create a Communicator object
+    	final Communicator multiSpeakerCom = new Communicator();
+        
+    	
+    	//Create 5 speakers that each will speak a word (1-5) when they are forked
+    	KThread speaker1 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
+				multiSpeakerCom.speak(1);
+			}
+		});
+
+        KThread speaker2 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
+				multiSpeakerCom.speak(2);
+			}
+		});
+
+        KThread speaker3 = new KThread(new Runnable(){
+			public void run(){
+				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
+				multiSpeakerCom.speak(3);
+			}
+		});
+
+
+        KThread listner = new KThread(new Runnable(){
+			public void run(){
+				for(int i = 0; i < 3; i++) {
+                    Lib.debug(CommunicatorTestChar, "listner recived word: " 
+    												+ multiSpeakerCom.listen() + ".");
+                }
+
+			}
+		});
+
+
+        speaker1.fork();
+        speaker2.fork();
+        speaker3.fork();
+        listner.fork();
+        
+        listner.join();
+        Lib.debug(CommunicatorTestChar, "timer ending");
+        long end = System.currentTimeMillis();
+     
+        
+        long elapsedTime = end - start;
+        Lib.debug(CommunicatorTestChar, "Test took: " + Long.toString(elapsedTime) + " millisecond");
     }
 }
