@@ -38,7 +38,7 @@ public class Alarm {
             waitQueue.poll().getWaitThread().ready();
         }
 
-        Machine.interrupt().restore(interrupt)
+        Machine.interrupt().restore(interrupt);
         KThread.yield();
     }
 
@@ -70,7 +70,7 @@ public class Alarm {
         Machine.interrupt().restore(interrupt);
     }
 
-    private class waitThread implement Comparable<waitThread>{
+    private class waitThread implements Comparable<waitThread>{
         //waitThread data fields
         private long wakeTime;
         private KThread waitThread;
@@ -93,9 +93,9 @@ public class Alarm {
 
         //Comparable Interface Implementation
         public int compareTo(waitThread otherThread){
-            if(wakeTime > other.wakeTime)
+            if(wakeTime > otherThread.wakeTime)
                 return 1;
-            else if(wakeTime == other.wakeTime)
+            else if(wakeTime == otherThread.wakeTime)
                 return 0;
             else
                 return -1;
@@ -120,7 +120,7 @@ public class Alarm {
         KThread threadA = new KThread();
         KThread threadB = new KThread();
         KThread threadC = new KThread();
-        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Three threads (A,B,C) created.");
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and three test threads (A,B,C) created. Order Expected: Thread C, B, A");
 
         threadA.setTarget(new Runnable(){
             public void run(){
@@ -158,7 +158,7 @@ public class Alarm {
         KThread thread2 = new KThread();
         KThread thread3 = new KThread();
 
-        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and three test threads (1,2,3) created.");
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and three test threads (1,2,3) created. Order Expected: Thread 1, 2, 3");
 
         thread1.setTarget(new Runnable(){
             public void run(){
