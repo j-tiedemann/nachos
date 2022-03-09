@@ -1,6 +1,8 @@
 package nachos.threads;
 
 import nachos.machine.*;
+import java.util.PriorityQueue;
+import nachos.threads.KThread;
 
 /**
  * Uses the hardware timer to provide preemption, and to allow threads to sleep
@@ -27,7 +29,17 @@ public class Alarm {
      * that should be run.
      */
     public void timerInterrupt() {
-	KThread.currentThread().yield();
+        //timerInterrupt Data Fields
+        long currentTime = Machine.timer().getTime();
+        boolean interrupt = Machine.interrupt().disable();
+
+        //check the PriorityQueue for waitThreads that have a finished wait time and ready them
+        while(!waitQueue.isEmpty() && (waitQueue.peek().getWakeTime() <= currentTime)){
+            waitQueue.poll().getWaitThread().ready();
+        }
+
+        Machine.interrupt().restore(interrupt);
+        KThread.yield();
     }
 
     /**
@@ -44,10 +56,173 @@ public class Alarm {
      *
      * @see	nachos.machine.Timer#getTime()
      */
-    public void waitUntil(long x) {
-	// for now, cheat just to get something working (busy waiting is bad)
-	long wakeTime = Machine.timer().getTime() + x;
-	while (wakeTime > Machine.timer().getTime())
-	    KThread.yield();
+    public void waitUntil(long waitTime) {
+        //store the interrupt status
+        boolean interrupt = Machine.interrupt().disable();
+        //calculate the time the thread needs to wake
+        long wakeTime = Machine.timer().getTime() + waitTime;
+        //use custom waitThread object to store KThread and calculated wakeTime
+        waitThread waiter = new waitThread(KThread.currentThread(), wakeTime);
+
+        waitQueue.add(waiter);
+        KThread.sleep();
+
+        Machine.interrupt().restore(interrupt);
+    }
+
+    private class waitThread implements Comparable<waitThread>{
+        //waitThread data fields
+        private long wakeTime;
+        private KThread waitThread;
+
+        //waitThread class constructor
+        public waitThread(KThread thread, long time){
+            this.waitThread = thread;
+            this.wakeTime = time;
+        }
+
+        //wakeTime accessor
+        public long getWakeTime(){
+            return wakeTime;
+        }
+
+        //waitThread accessor
+        public KThread getWaitThread(){
+            return waitThread;
+        }
+
+        //Comparable Interface Implementation
+        public int compareTo(waitThread otherThread){
+            if(wakeTime > otherThread.wakeTime)
+                return 1;
+            else if(wakeTime == otherThread.wakeTime)
+                return 0;
+            else
+                return -1;
+        }
+    }
+
+    //Priority queue object implementation using the custom object waitThread to store and sort threads according
+    //to their timeToWait
+    private PriorityQueue<waitThread> waitQueue = new PriorityQueue<waitThread>();
+
+    /**
+     * selfTest() method tests to make sure that threads are put to sleep and awoken in the proper order. The order
+     * is determined by the timeToWait rather than the order in which the threads were put to sleep.
+     */
+    private static final char AlarmTestChar = 'a';
+    public static void selftest(){
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Starting self test.");
+        final Alarm testAlarm = new Alarm();
+
+        //Create one thread and see how long it takes to wake
+        KThread threadAlpha = new KThread();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Alpha) created. Wait time 1000000");
+
+        threadAlpha.setTarget(new Runnable(){
+            public void run(){
+                long start = Machine.timer().getTime();
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha waiting.");
+                testAlarm.waitUntil(1000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha finished after " + Long.toString(Machine.timer().getTime() - start) + ".");
+            }
+        });
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking thread Alpha.");
+        threadAlpha.fork();
+        threadAlpha.join();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with single wait times finished.");
+
+        //Create three threads with differant WaitTime
+        //Order Expected: Thread C, B, A
+        KThread threadA = new KThread();
+        KThread threadB = new KThread();
+        KThread threadC = new KThread();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and three test threads (A,B,C) created. Order Expected: Thread C, B, A");
+
+        threadA.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread A waiting.");
+                testAlarm.waitUntil(20000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread A finished.");
+            }
+        });
+        threadB.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread B waiting.");
+                testAlarm.waitUntil(10000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread B finished.");
+            }
+        });
+        threadC.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread C waiting.");
+                testAlarm.waitUntil(1000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread C finished.");
+            }
+        });
+
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking threads A, B, and C.");
+        threadA.fork();
+        threadB.fork();
+        threadC.fork();
+        threadA.join();
+
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with different wait times finished.");
+
+        //Create three threads with the same WaitTime
+        //Order Expected: Same order as call
+        KThread thread1 = new KThread();
+        KThread thread2 = new KThread();
+        KThread thread3 = new KThread();
+
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and three test threads (1,2,3) created. Order Expected: Thread 1, 2, 3");
+
+        thread1.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 1 waiting.");
+                testAlarm.waitUntil(10000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 1 finished.");
+            }
+        });
+        thread2.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 2 waiting.");
+                testAlarm.waitUntil(10000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 2 finished.");
+            }
+        });
+        thread3.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 3 waiting.");
+                testAlarm.waitUntil(10000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread 3 finished.");
+            }
+        });
+
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking threads 1, 2, and 3.");
+        thread1.fork();
+        thread2.fork();
+        thread3.fork();
+        thread3.join();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with same wait times finished.");
+
+        //Create one thread with negative wait time
+        KThread threadNeg = new KThread();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Neg) created. Wait time -100");
+
+        threadNeg.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Neg waiting.");
+                testAlarm.waitUntil(-100);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Neg finished.");
+            }
+        });
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking thread Neg.");
+        threadNeg.fork();
+        threadNeg.join();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with negative wait times finished.");
+
+
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Finished selfTest(), passed.");
     }
 }
