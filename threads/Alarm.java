@@ -113,8 +113,25 @@ public class Alarm {
     private static final char AlarmTestChar = 'a';
     public static void selftest(){
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Starting self test.");
-
         Alarm testAlarm = new Alarm();
+
+        //Create one thread and see how long it takes to wake
+        KThread threadAlpha = new Kthread();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Alpha) created. Wait time 1000000");
+
+        threadAlpha.setTarget(new Runnable(){
+            public void run(){
+                long start = Machine.timer().getTime();
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha waiting.");
+                testAlarm.waitUntil(20000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha finished after " + Machine.timer().getTime() - start + ".");
+            }
+        });
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking thread Alpha.");
+        threadAlpha.fork();
+        threadAlpha.join();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with single wait times finished.");
+
         //Create three threads with differant WaitTime
         //Order Expected: Thread C, B, A
         KThread threadA = new KThread();
@@ -188,6 +205,24 @@ public class Alarm {
         thread3.fork();
         thread3.join();
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with same wait times finished.");
+
+        //Create one thread with negative wait time
+        KThread threadNeg = new Kthread();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Neg) created. Wait time -100");
+
+        threadNeg.setTarget(new Runnable(){
+            public void run(){
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Neg waiting.");
+                testAlarm.waitUntil(-100);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Neg finished.");
+            }
+        });
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking thread Neg.");
+        threadNeg.fork();
+        threadNeg.join();
+        Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with negative wait times finished.");
+
+
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Finished selfTest(), passed.");
     }
 }
