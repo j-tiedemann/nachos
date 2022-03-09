@@ -1,326 +1,183 @@
 package nachos.threads;
-import java.util.Timer;
 
-import nachos.machine.*;
+import java.util.LinkedList;
 
-/**
- * A <i>communicator</i> allows threads to synchronously exchange 32-bit
- * messages. Multiple threads can be waiting to <i>speak</i>,
- * and multiple threads can be waiting to <i>listen</i>. But there should never
- * be a time when both a speaker and a listener are waiting, because the two
- * threads can be paired off at this point.
- */
-public class Communicator {
-    
-    private static final char CommunicatorTestChar = 'c';
-    private int message;
-    private Boolean wordSpoken;
-    private Condition2 speaker;
-    private Condition2 listener;
-    private Lock lock;
-    private int numListners;
-    /**
-     * Allocate a new communicator.
-     */
-    public Communicator() {
+import nachos.machine.Lib;
+import nachos.machine.Machine;
 
-        lock = new Lock();
-        speaker = new Condition2(lock);
-        listener = new Condition2(lock);
-        wordSpoken = false;
-        numListners = 0;
-    }
+public class Condition2 {
 
-    /**
-     * Wait for a thread to listen through this communicator, and then transfer
-     * <i>word</i> to the listener.
-     *
-     * <p>
-     * Does not return until this thread is paired up with a listening thread.
-     * Exactly one listener should receive <i>word</i>.
-     *
-     * @param	word	the integer to transfer.
-     */
-    public void speak(int word) {
-        lock.acquire();
+  private static final char dbgC2 = 'f';
+  private Lock conditionLock;
+  private LinkedList<KThread> waitList;
+  
+	public Condition2(Lock conditionLock) {
+		this.conditionLock = conditionLock;
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 start");
+		this.waitList = new LinkedList<KThread>();
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 end");
+		}
 
-        //check for a listener 
-        while(numListners == 0 || wordSpoken) {
-            speaker.sleep();
-    
-        }
-        //work has been spoken
-        wordSpoken = true;
-        message = word;
-        listener.wake(); //wake up listener
-        lock.release();
-    }
+	//Threads and interrupts must be suspended to maintain atomicity
+	//Lock disabled during operation to prevent thread from being //usable by concurrent method (this is also done for wake()) 
+	//sleep() method adds threads to our waitList for future use 
+		
+	public void sleep() {
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 sleep start");
+		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+		//Lib.assertTrue(KThread.currentThread().status != statusFinished);
+		
+		
+		waitList.add(KThread.currentThread());
+		boolean intSatus = Machine.interrupt().disable(); 
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 sleep: interrupts disabled");
+		conditionLock.release();
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 sleep: lock released");
+		KThread.currentThread().sleep();
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 lock slept");
+		conditionLock.acquire();
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 sleep: lock acquired");
+		Machine.interrupt().restore(intSatus);
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 sleep: interrupts enabled");
+	   }
 
-    /**
-     * Wait for a thread to speak through this communicator, and then return
-     * the <i>word</i> that thread passed to <tt>speak()</tt>.
-     *
-     * @return	the integer transferred.
-     */    
-    public int listen() {
-        lock.acquire();
-
-        numListners++; //increase listener count
-        speaker.wake();
-
-        listener.sleep();
-
-        int wordTransfer = message; //transfer word
-        wordSpoken = false;
-
-        numListners--;
-        speaker.wake();
-        lock.release();
-        return wordTransfer;
-
-    }
-
-    public static void selfTest(){
-        Lib.debug(CommunicatorTestChar, "-----------------------");
-        Lib.debug(CommunicatorTestChar, "Comuincator test case");
-
-		basicTest();
-        multipleSpeakers();
-        multipleListeners();
-        performanceTest();
-
-        Lib.debug(CommunicatorTestChar, "-----------------------");
-    
-    }
-
-    /*
-     * basic test to see if threads can pass messages 
-     * 
-     */
-    public static void basicTest() {
-        final Communicator comTest = new Communicator();
-
-		//Test case 1
-		KThread speakerThread = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Test Case 1: basic test one speaker and lisitner.");
-				Lib.debug(CommunicatorTestChar, "Sending message 15");
-				comTest.speak(15);
+	//wake() uses a waker thread to pull a thread out of the waitList //for use
+	public void wake() {
+		Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+		boolean intSatus = Machine.interrupt().disable();
+		if (waitList.peek() != null) {
+			
+			Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 wake: interrupts disabled");
+			try {
+				((KThread)waitList.poll()).ready();
 			}
-		});
-
-		speakerThread.fork();
-
-		KThread listenThread = new KThread(new Runnable(){
-			public void run(){
-				int result = comTest.listen();
-				Lib.debug(CommunicatorTestChar, "" + result);
-				if(result == 15)
-					Lib.debug(CommunicatorTestChar, "Test 1 Successful! Message " + result + " received.\n");
-				else
-					Lib.debug(CommunicatorTestChar, "Test 1 Failed.\n");
+			catch(Exception e) {
+				
 			}
-		});
-
-		listenThread.fork();
-		listenThread.join();
-		speakerThread.join();
-		Lib.debug(CommunicatorTestChar, "-----------------------");
-    }
-    
-    /*
-     * 
-     * Test to see if Communicator can handle multiple speakers speaking 
-     */
-    public static void multipleSpeakers() {
-
-        Lib.debug(CommunicatorTestChar, "Test 2: multiple speakers ");
-    	//Create a Communicator object
-    	final Communicator multiSpeakerCom = new Communicator();
-       
-    	
-    	//Create 5 speakers that each will speak a word (1-5) when they are forked
-    	KThread speaker1 = new KThread(new Runnable(){
+			
+			
+		}
+		
+		Machine.interrupt().restore(intSatus);
+		Lib.debug(dbgC2, Machine.timer().getTime() + "Cnd2 wake: interrupts disabled");
+		}
+	public void wakeAll() {
+			Lib.assertTrue(conditionLock.isHeldByCurrentThread());
+			while (!waitList.isEmpty()) {
+				wake();
+	}
+		
+	}
+	
+	
+	public static void selfTest()
+	{
+		final Lock sTLock = new Lock();
+		final Condition2 sTCond = new Condition2(sTLock);
+		KThread sleepThread1 = new KThread(new Runnable(){
 			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
-				multiSpeakerCom.speak(1);
-			}
-		});
-
-        KThread speaker2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
-				multiSpeakerCom.speak(2);
-			}
-		});
-
-        KThread speaker3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 3: sending 3");
-				multiSpeakerCom.speak(3);
-			}
-		});
-    	
-        KThread listen1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listen 1: recived:" + multiSpeakerCom.listen());
-			}
-		});
-
-        KThread listen2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listen 2: recived:" + multiSpeakerCom.listen());
-			}
-		});
-
-        KThread listen3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listen 3: recived:" + multiSpeakerCom.listen());
-			}
-		});
-
-        speaker1.fork();
-        speaker2.fork();
-        speaker3.fork();
-        listen1.fork();
-        listen2.fork();
-        listen3.fork();
-
-        speaker1.join();
-        speaker2.join();
-        speaker3.join();
-     
-        Lib.debug(CommunicatorTestChar, "Test 2 Successful");
-        Lib.debug(CommunicatorTestChar, "-----------------------");
-
-    }
-    /*
-     * Test to see if Communicator can 
-     */
-    public static void multipleListeners() {
-
-        Lib.debug(CommunicatorTestChar, "Test 3: multiple listners ");
-
-        final Communicator multiSpeakerCom = new Communicator();
-
-        KThread listen1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listener 1: ready to listen ");
-    			Lib.debug(CommunicatorTestChar, "listener1 recived word: " 
-    												+ multiSpeakerCom.listen() + ".");
-			}
-		});
-
-        KThread listen2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listener 2: ready to listen ");
-    			Lib.debug(CommunicatorTestChar, "listener2 recived word: " 
-    												+ multiSpeakerCom.listen() + ".");
-			}
-		});
-
-        KThread listen3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "listener 3: ready to listen ");
-    			Lib.debug(CommunicatorTestChar, "listener3 recived word: " 
-    												+ multiSpeakerCom.listen() + ".");
-			}
-		});
-
-
-        KThread speaker1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
-				multiSpeakerCom.speak(1);
-			}
-		});
-
-        KThread speaker2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
-				multiSpeakerCom.speak(2);
-			}
-		});
-
-        KThread speaker3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 3: sending 3");
-				multiSpeakerCom.speak(3);
-			}
-		});
-
-        listen1.fork();
-        listen2.fork();
-        listen3.fork();
-        speaker1.fork();
-        speaker2.fork();
-        speaker3.fork();
-        
-        listen1.join();
-     
-        listen2.join();
-        
-        listen3.join();
-        Lib.debug(CommunicatorTestChar, "Test 3 Successful");
-        Lib.debug(CommunicatorTestChar, "-----------------------");
-
-    }
-    public static void performanceTest() {
-    	
-    	long start = System.currentTimeMillis();
-    	
-        Lib.debug(CommunicatorTestChar, "Test 4: Performance test ");
-        Lib.debug(CommunicatorTestChar, "Starting timer");
-   
-    	//Create a Communicator object
-    	final Communicator multiSpeakerCom = new Communicator();
-        
-    	
-    	//Create 5 speakers that each will speak a word (1-5) when they are forked
-    	KThread speaker1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 1");
-				multiSpeakerCom.speak(1);
-			}
-		});
-
-        KThread speaker2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 2: sending 2");
-				multiSpeakerCom.speak(2);
-			}
-		});
-
-        KThread speaker3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
-				multiSpeakerCom.speak(3);
-			}
-		});
-
-
-        KThread listner = new KThread(new Runnable(){
-			public void run(){
-				for(int i = 0; i < 3; i++) {
-                    Lib.debug(CommunicatorTestChar, "listner recived word: " 
-    												+ multiSpeakerCom.listen() + ".");
-                }
-
-			}
-		});
-
-
-        speaker1.fork();
-        speaker2.fork();
-        speaker3.fork();
-        listner.fork();
-        
-        listner.join();
-        Lib.debug(CommunicatorTestChar, "timer ending");
-        long end = System.currentTimeMillis();
-     
-        
-        long elapsedTime = end - start;
-        Lib.debug(CommunicatorTestChar, "Test took: " + Long.toString(elapsedTime) + " millisecond");
-    }
+				sTLock.acquire();
+				System.out.println("sleepThread1 Lock acquired. Commencing Condition2 test cases...");
+				sTCond.sleep();
+				System.out.println("sleepThread1: slept");
+				System.out.println("sleepThread1: test complete");
+				sTLock.release();
+				System.out.println("sleepThread1: Lock released.");
+		}});
+		sleepThread1.setName("Sleep Test 1");
+			System.out.println("Forking sleepThread 1");
+			sleepThread1.fork();
+			KThread sleepThread2 = new KThread(new Runnable(){
+				
+				public void run() {
+					sTLock.acquire();
+					System.out.println("sleepThread2 Lock acquired. Sleeping...");
+					sTCond.sleep();
+					
+					System.out.println("sleepThread2: slept");
+					System.out.println("sleepThread2: test complete");
+					sTLock.release();
+					System.out.println("sleepThread2: Lock released.");
+	
+				}
+			});
+			
+			sleepThread2.setName("Sleep Test 2");
+			System.out.println("Forking sleepThread 2");
+			sleepThread2.fork();
+				
+			KThread sleepThread3 = new KThread(new Runnable(){
+				
+							
+			public void run() {
+				sTLock.acquire();
+				System.out.println("sleepThread3 Lock acquired. Sleeping...");
+				sTCond.sleep();
+					
+				System.out.println("sleepThread3 slept");
+				System.out.println("sleepThread3: test complete");
+				sTLock.release();
+				System.out.println("sleepThread3: Lock released.");
+					
+				}
+			});
+		
+			sleepThread3.setName("Wake test 1");
+				System.out.println("Forking sleepThread3");
+				sleepThread3.fork();
+				
+				KThread wakeThread1 = new KThread(new Runnable(){
+					
+					public void run() {
+					sTLock.acquire();
+					System.out.println("wakeThread1 Lock acquired. Waking...");
+					sTCond.wake();
+					
+					System.out.println("wakeThread1 woken");
+					System.out.println("wakeThread1: test complete");
+					sTLock.release();
+					System.out.println("wakeThread1: Lock released.");
+					
+				}
+				});
+				wakeThread1.setName("Wake Test 2");
+			System.out.println("Forking wakeThread1");
+				wakeThread1.fork();
+				
+				KThread wakeThread2 = new KThread(new Runnable(){
+					
+					public void run() {
+					sTLock.acquire();
+					System.out.println("wakeThread2 Lock acquired. Waking all...");
+					sTCond.wakeAll();
+					
+					System.out.println("wakeThread2 woken all");
+					System.out.println("wakeThread2 test complete");
+					sTLock.release();
+					System.out.println("wakeThread2 Lock released.");
+					}
+				});
+				wakeThread2.setName("Wake Test 3");
+			System.out.println("Forking wakeThread1");
+			wakeThread2.fork();
+				
+			KThread wakeThread3 = new KThread(new Runnable(){
+					
+					public void run() {
+					sTLock.acquire();
+					System.out.println("wakeThread2 Lock acquired. Waking all with no wakeable threads...");
+					sTCond.wakeAll();
+					System.out.println("No threads to wake");
+					System.out.println("wakeThread2 test complete");
+					sTLock.release();
+					System.out.println("wakeThread2 Lock released.");
+				}
+			});
+	}
 }
+	
+
+
+				
+					
+				
