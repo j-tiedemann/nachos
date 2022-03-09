@@ -439,109 +439,10 @@ public class KThread {
     public static void selfTest() {
 		Lib.debug(dbgThread, "KThread.selfTest(): Starting self test.");
 	
-		//Default selfTest() lines for KThread
-		new KThread(new PingTest(1)).setName("forked thread").fork();
-		new PingTest(0).run();
-		
-		Lib.debug(dbgThread, "KThread.selfTest(): Finished default tests, beginning custom tests.");
-		
-		//Custom selfTest() methods we wrote
-		selfJoinTest();
-		joinFinishedTest();
-		
-		
 		Lib.debug(dbgThread, "KThread.selfTest(): Finished self test, passed.");
 		
     }
     
-    /**
-     * Tests whether threads are able to join themselves.
-     * Threads should not be able to join themselves, and any
-     * self join should be blocked since the thread would never wake.
-     */
-    private static void selfJoinTest(){
-		Lib.debug(dbgThread, "KThread.selfJoinTest(): Starting self join test.");
-    
-    	//Create a thread
-    	final KThread thread = new KThread();
-		thread.setName("Self");
-    	Lib.debug(dbgThread, "KThread.selfJoinTest(): Thread created.");
-
-    	//Set the thread's target to run a join on itself
-		thread.setTarget(new Runnable() {
-		public void run(){
-			String result = "Self join test failed.";
-			
-			try{
-				Lib.debug(dbgThread, "KThread.selfJoinTest(): Thread about to join itself.");
-				thread.join();
-			}
-			catch (Error e){
-				Lib.debug(dbgThread, "Blocked, attempting to join self. Thread: " + thread.toString());
-				result = "Self join test, passed.";
-			}
-				
-			Lib.debug(dbgThread, "KThread.selfJoinTest(): " + result);
-		}
-	});
-		//Execute the thread
-		thread.fork();
-		thread.join();
-    }
-    
-	/**
-	 * Tests whether threads are able to joined threads that have already finished.
-	 * Threads should never be able to join finished threads as they would be waiting
-	 * for a thread to finish that has already finished.
-	 */
-	private static void joinFinishedTest(){
-	
-		Lib.debug(dbgThread, "KThread.joinFinishedTest(): Starting test to join finished thread.");
-		
-		//Create two threads, one to finish and one to join afterwards
-		final KThread deadThread = new KThread();
-		KThread joiner = new KThread();
-		//Set names for debugging purposes
-		joiner.setName("Joiner");
-		deadThread.setName("Finished Thread");
-		
-		Lib.debug(dbgThread, "KThread.joinFinishedTest(): Two threads created, deadThread and joiner.");
-
-		//Set deadThread's run to finish immediately
-		deadThread.setTarget(new Runnable() {
-			public void run(){
-				Lib.debug(dbgThread, "KThread.joinFinishedTest(): deadThread finished running.");
-			}
-		});
-
-		//Set joiner's thread to attempt to join deadThread
-    	joiner.setTarget(new Runnable() {
-			public void run(){
-				Lib.debug(dbgThread, "KThread.joinFinishedTest(): joiner about to join deadThread.");
-				deadThread.join();
-			}
-		});
-
-		//Execute both threads
-		deadThread.fork();
-		joiner.fork();
-		joiner.join();
-		
-		Lib.debug(dbgThread, "KThread.joinFinishedTest(): Finished thread join test, passed.");
-
-	}
-					
-		
-    /**
-     * Tests whether threads can join a thread that is joined to them through a cyclical dependency.
-     * Threads should never be allowed to join themselves via a cyclical dependency since they would
-     * never wake up. Should be blocked in join().
-     */
-    
-    
-
-    private static final char dbgThread = 't';
-
     /**
      * Additional state used by schedulers.
      *
