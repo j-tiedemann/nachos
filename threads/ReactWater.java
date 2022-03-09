@@ -1,230 +1,92 @@
 package nachos.threads;
 
-
-import java.util.concurrent.TimeUnit;
-
 import nachos.machine.*;
 
-public class ReactWater{
-
-    private static final char ReactWaterTestChar = 'r';
-    private Lock lock; 
-    private Condition hydrogen; 
-    private Condition oxygen;
-    private int numHydrogen;
-    private int numOxygen;
-    private Boolean madeWater;
-    /** 
-     *   Constructor of ReactWater
-     **/
-    public ReactWater() {
-        lock = new Lock();
-        hydrogen = new Condition(lock);
-        oxygen = new Condition(lock);
-        numHydrogen = 0;
-        numOxygen = 0;
-        madeWater = false;
-
-    } // end of ReactWater()
-
-    /** 
-     *   When H element comes, if there already exist another H element 
-     *   and an O element, then call the method of Makewater(). Or let 
-     *   H element wait in line. 
-     **/ 
-    public void hReady() {
-        lock.acquire(); //Atomically acquire the lock
-        ++numHydrogen;
-
-        while(numHydrogen < 2 || numOxygen < 1){
-        //Test madeWater flag, flip if true and release the lock
-            if(madeWater){
-                madeWater = false;
-                lock.release();
-                return;
-            } else //otherwise sleep the hydrogen thread
-                hydrogen.sleep();
-            }
-        //We have enough atom threads
-        makeWater();
-        oxygen.wake();
-        lock.release();
-    
-    } // end of hReady()
- 
-    /** 
-     *   When O element comes, if there already exist another two H
-     *   elements, then call the method of Makewater(). Or let O element
-     *   wait in line. 
-     **/ 
-    public void oReady() {
-
-        lock.acquire();
-	    ++numOxygen;
-	    //Waking a hydrogen atom will initiate a check for
-	    //the number of readied atoms
-	    hydrogen.wake();
-	    oxygen.sleep();
-	    //when water is made the oxygen atom will wake the second
-	    //hydrogen atom
-	    hydrogen.wake();
-	    lock.release();
-    } // end of oReady()
-    
-    /** 
-     *   Print out the message of "water was made!".
-     **/
-    public void makeWater() {
-        numHydrogen -= 2;
-        --numOxygen;
-        madeWater = true;
-     //   System.out.println("Water was made!");
-        Lib.debug(ReactWaterTestChar, "Water was made");
-        
-
-    } // end of Makewater()
-
-    public void terminate() {
-    	lock.acquire();
-    	//hydrogen.wake();
-		lock.release();
+/**
+ * A multi-threaded OS kernel.
+ */
+public class ThreadedKernel extends Kernel {
+    /**
+     * Allocate a new multi-threaded kernel.
+     */
+    public ThreadedKernel() {
+	super();
     }
 
-    public static void selfTest() {
-        Lib.debug(ReactWaterTestChar, "------------------");
-        Lib.debug(ReactWaterTestChar, "Testing for react water");
+    /**
+     * Initialize this kernel. Creates a scheduler, the first thread, and an
+     * alarm, and enables interrupts. Creates a file system if necessary.   
+     */
+    public void initialize(String[] args) {
+	// set scheduler
+	String schedulerName = Config.getString("ThreadedKernel.scheduler");
+	scheduler = (Scheduler) Lib.constructObject(schedulerName);
 
-        basicTest();
-        manyWater();
-        noWater();
+	// set fileSystem
+	String fileSystemName = Config.getString("ThreadedKernel.fileSystem");
+	if (fileSystemName != null)
+	    fileSystem = (FileSystem) Lib.constructObject(fileSystemName);
+	else if (Machine.stubFileSystem() != null)
+	    fileSystem = Machine.stubFileSystem();
+	else
+	    fileSystem = null;
 
-        Lib.debug(ReactWaterTestChar, "------------------");
-      }
+	// start threading
+	new KThread(null);
 
-    public static void basicTest() {
+	alarm  = new Alarm();
+	
+	dummy5 = new Communicator(); 
 
-        Lib.debug(ReactWaterTestChar, "Test Case 1: Basic test");
-        final ReactWater MotherNature = new ReactWater();
-
-
-        KThread h1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 1 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread h2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 2 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread o1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "oyygen1 ready ");
-				MotherNature.oReady();
-			}
-		});
-
-        h1.fork();
-        h2.fork();
-        o1.fork();
-        h1.join();
-        Lib.debug(ReactWaterTestChar, "Test case 1 successful ");
-        Lib.debug(ReactWaterTestChar, "------------------");
+	Machine.interrupt().enable();
     }
 
-    public static void noWater() {
-    	
-    	Lib.debug(ReactWaterTestChar, "Test Case 2: 1o and 1h");
-        final ReactWater MotherNature = new ReactWater();
-        KThread h1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 1 ready");
-				MotherNature.hReady();
-				KThread.finish();
-			}
-		});
-
-        KThread o1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "oyygen1 ready ");
-				MotherNature.oReady();
-				KThread.finish();
-			}
-		});
-        
-        KThread test = new KThread(new Runnable(){
-			public void run(){
+    /**
+     * Test this kernel. Test the <tt>KThread</tt>, <tt>Semaphore</tt>,
+     * <tt>SynchList</tt>, and <tt>ElevatorBank</tt> classes. Note that the
+     * autograder never calls this method, so it is safe to put additional
+     * tests here.
+     */	
+    public void selfTest() {
+	KThread.selfTest();
+	Semaphore.selfTest();
+	SynchList.selfTest();
+	Communicator.selfTest();
+	Alarm.selftest();
+	ReactWater.selfTest();
 		
-				//MotherNature.terminate();
-			}
-		});
-
-        h1.fork();
-        
-        o1.fork();
-        test.fork();
-       
-     
-        test.join();
-       
-        Lib.debug(ReactWaterTestChar, "No water made");
-        Lib.debug(ReactWaterTestChar, "Test case 3 successful ");
-        
-        
+	if (Machine.bank() != null) {
+	    ElevatorBank.selfTest();
+	}
     }
     
-    public static void manyWater() {
-    	Lib.debug(ReactWaterTestChar, "Test Case 3: Many hydrogen ");
-        final ReactWater MotherNature = new ReactWater();
-        KThread h1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 1 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread h2 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 2 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread h3 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 2 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread h4 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "hydrogen 2 ready");
-				MotherNature.hReady();
-			}
-		});
-
-        KThread o1 = new KThread(new Runnable(){
-			public void run(){
-				Lib.debug(ReactWaterTestChar, "oyygen1 ready ");
-				MotherNature.oReady();
-			}
-		});
-    	
-        h1.fork();
-        h2.fork();
-        h3.fork();
-        h4.fork();
-        o1.fork();
-        o1.join();
-        Lib.debug(ReactWaterTestChar, "Test case 2 successful ");
-        Lib.debug(ReactWaterTestChar, "------------------");
+    /**
+     * A threaded kernel does not run user programs, so this method does
+     * nothing.
+     */
+    public void run() {
     }
-    
 
-} // end of class ReactWater
- 
+    /**
+     * Terminate this kernel. Never returns.
+     */
+    public void terminate() {
+	Machine.halt();
+    }
+
+    /** Globally accessible reference to the scheduler. */
+    public static Scheduler scheduler = null;
+    /** Globally accessible reference to the alarm. */
+    public static Alarm alarm = null;
+    /** Globally accessible reference to the file system. */
+    public static FileSystem fileSystem = null;
+
+    // dummy variables to make javac smarter
+    private static RoundRobinScheduler dummy1 = null;
+    private static PriorityScheduler dummy2 = null;
+    private static LotteryScheduler dummy3 = null;
+    private static Condition2 dummy4 = null;
+    private static Communicator dummy5 = null;
+    private static Rider dummy6 = null;
+    private static ElevatorController dummy7 = null;
+}
