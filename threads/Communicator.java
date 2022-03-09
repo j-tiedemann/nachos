@@ -15,8 +15,8 @@ public class Communicator {
     private static final char CommunicatorTestChar = 'c';
     private int message;
     private Boolean wordSpoken;
-    private Condition speaker;
-    private Condition listener;
+    private Condition2 speaker;
+    private Condition2 listener;
     private Lock lock;
     private int numListners;
     /**
@@ -25,8 +25,8 @@ public class Communicator {
     public Communicator() {
 
         lock = new Lock();
-        speaker = new Condition(lock);
-        listener = new Condition(lock);
+        speaker = new Condition2(lock);
+        listener = new Condition2(lock);
         wordSpoken = false;
         numListners = 0;
     }
@@ -44,14 +44,15 @@ public class Communicator {
     public void speak(int word) {
         lock.acquire();
 
+        //check for a listener 
         while(numListners == 0 || wordSpoken) {
             speaker.sleep();
     
         }
-
+        //work has been spoken
         wordSpoken = true;
         message = word;
-        listener.wake();
+        listener.wake(); //wake up listener
         lock.release();
     }
 
@@ -64,12 +65,12 @@ public class Communicator {
     public int listen() {
         lock.acquire();
 
-        numListners++;
+        numListners++; //increase listener count
         speaker.wake();
 
         listener.sleep();
 
-        int wordTransfer = message;
+        int wordTransfer = message; //transfer word
         wordSpoken = false;
 
         numListners--;
@@ -92,6 +93,10 @@ public class Communicator {
     
     }
 
+    /*
+     * basic test to see if threads can pass messages 
+     * 
+     */
     public static void basicTest() {
         final Communicator comTest = new Communicator();
 
@@ -123,6 +128,10 @@ public class Communicator {
 		Lib.debug(CommunicatorTestChar, "-----------------------");
     }
     
+    /*
+     * 
+     * Test to see if Communicator can handle multiple speakers speaking 
+     */
     public static void multipleSpeakers() {
 
         Lib.debug(CommunicatorTestChar, "Test 2: multiple speakers ");
@@ -147,7 +156,7 @@ public class Communicator {
 
         KThread speaker3 = new KThread(new Runnable(){
 			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
+				Lib.debug(CommunicatorTestChar, "Speaker 3: sending 3");
 				multiSpeakerCom.speak(3);
 			}
 		});
@@ -185,7 +194,9 @@ public class Communicator {
         Lib.debug(CommunicatorTestChar, "-----------------------");
 
     }
-    
+    /*
+     * Test to see if Communicator can 
+     */
     public static void multipleListeners() {
 
         Lib.debug(CommunicatorTestChar, "Test 3: multiple listners ");
@@ -210,8 +221,8 @@ public class Communicator {
 
         KThread listen3 = new KThread(new Runnable(){
 			public void run(){
-				Lib.debug(CommunicatorTestChar, "listener 2: ready to listen ");
-    			Lib.debug(CommunicatorTestChar, "listener2 recived word: " 
+				Lib.debug(CommunicatorTestChar, "listener 3: ready to listen ");
+    			Lib.debug(CommunicatorTestChar, "listener3 recived word: " 
     												+ multiSpeakerCom.listen() + ".");
 			}
 		});
@@ -233,7 +244,7 @@ public class Communicator {
 
         KThread speaker3 = new KThread(new Runnable(){
 			public void run(){
-				Lib.debug(CommunicatorTestChar, "Speaker 1: sending 3");
+				Lib.debug(CommunicatorTestChar, "Speaker 3: sending 3");
 				multiSpeakerCom.speak(3);
 			}
 		});
