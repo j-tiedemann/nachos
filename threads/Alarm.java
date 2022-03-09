@@ -113,18 +113,18 @@ public class Alarm {
     private static final char AlarmTestChar = 'a';
     public static void selftest(){
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Starting self test.");
-        Alarm testAlarm = new Alarm();
+        final Alarm testAlarm = new Alarm();
 
         //Create one thread and see how long it takes to wake
-        KThread threadAlpha = new Kthread();
+        KThread threadAlpha = new KThread();
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Alpha) created. Wait time 1000000");
 
         threadAlpha.setTarget(new Runnable(){
             public void run(){
                 long start = Machine.timer().getTime();
                 Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha waiting.");
-                testAlarm.waitUntil(20000000);
-                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha finished after " + Machine.timer().getTime() - start + ".");
+                testAlarm.waitUntil(1000000);
+                Lib.debug(AlarmTestChar, "Alarm.selfTest(): Thread Alpha finished after " + Long.toString(Machine.timer().getTime() - start) + ".");
             }
         });
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Forking thread Alpha.");
@@ -207,7 +207,7 @@ public class Alarm {
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm test with same wait times finished.");
 
         //Create one thread with negative wait time
-        KThread threadNeg = new Kthread();
+        KThread threadNeg = new KThread();
         Lib.debug(AlarmTestChar, "Alarm.selfTest(): Alarm object and one test threads (Neg) created. Wait time -100");
 
         threadNeg.setTarget(new Runnable(){
