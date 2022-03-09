@@ -1,16 +1,10 @@
 package nachos.threads;
 
-import nachos.machine.*;
+import java.util.LinkedList;
 
-/**
- * An implementation of condition variables that disables interrupt()s for
- * synchronization.
- *
- * <p>
- * You must implement this.
- *
- * @see	nachos.threads.Condition
- */
+import nachos.machine.Lib;
+import nachos.machine.Machine;
+
 public class Condition2 {
 
   private static final char dbgC2 = 'f';
@@ -181,3 +175,9 @@ public class Condition2 {
 			});
 	}
 }
+	
+
+
+				
+					
+				
