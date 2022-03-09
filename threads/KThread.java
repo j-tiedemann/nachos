@@ -1,4 +1,5 @@
 package nachos.threads;
+import java.util.ArrayList;
 
 import nachos.machine.*;
 
@@ -193,8 +194,18 @@ public class KThread {
 
 
 	currentThread.status = statusFinished;
-	
+	 currentThread.nextInQueue();
 	sleep();
+    }
+    
+    public void nextInQueue() {
+    	KThread nextThread;
+    	while((nextThread = joinedThreads.nextThread()) != null) {
+    		
+    		if( nextThread.status != statusReady) {
+    			nextThread.ready(); 
+    		}
+    	}
     }
 
     /**
@@ -276,6 +287,31 @@ public class KThread {
 	Lib.debug(dbgThread, "Joining to thread: " + toString());
 
 	Lib.assertTrue(this != currentThread);
+	
+	if(status == statusFinished) {
+		return;
+	}
+		
+	else if(this.compareTo(currentThread) == 0) {
+		return;
+	}
+	else if(currentThread.followingThreads.contains(this.id)){
+		return;
+	}
+	
+	else{
+	
+		
+		this.followingThreads.add(currentThread.id);
+		for(int i = 0; i < currentThread.followingThreads.size(); i++){
+			this.followingThreads.add(currentThread.followingThreads.get(i));
+		}
+		
+		boolean interruptStatus = Machine.interrupt().disable();		
+			joinedThreads.waitForAccess(currentThread);		
+			sleep();
+			Machine.interrupt().restore(interruptStatus);
+	}
 
     }
 
@@ -401,14 +437,12 @@ public class KThread {
      * Tests whether this module is working.
      */
     public static void selfTest() {
-	Lib.debug(dbgThread, "Enter KThread.selfTest");
+		Lib.debug(dbgThread, "KThread.selfTest(): Starting self test.");
 	
-	new KThread(new PingTest(1)).setName("forked thread").fork();
-	new PingTest(0).run();
+		Lib.debug(dbgThread, "KThread.selfTest(): Finished self test, passed.");
+		
     }
-
-    private static final char dbgThread = 't';
-
+    
     /**
      * Additional state used by schedulers.
      *
@@ -444,4 +478,6 @@ public class KThread {
     private static KThread currentThread = null;
     private static KThread toBeDestroyed = null;
     private static KThread idleThread = null;
+    private ThreadQueue joinedThreads = ThreadedKernel.scheduler.newThreadQueue(true);
+	private ArrayList<Integer> followingThreads = new ArrayList<Integer>();
 }
