@@ -196,23 +196,23 @@ public class UserProcess{
 
 		return amount;
 	}
-	
-	Public int sysClose(int fileDescriptor){
+
+	public int sysClose(int fileDescriptor){
 
 		if(fileDescriptor < 0 || fileDescriptor > 15)
-			return -1; 
+			return -1;
 
-		if(globalFileTable[fileDescriptor] == null)
-			return -1; 
+		if(localFileTable[fileDescriptor] == null)
+			return -1;
 
-		Else {
-			globalFileTable[fileDescriptor].close();
-			globalFileTable[fileDescriptor] = null;
+		else {
+			localFileTable[fileDescriptor].close();
+			localFileTable[fileDescriptor] = null;
 		}
-		return 0; 
+		return 0;
 	}
-	
-	Public int unlink(int nameAddress) {
+
+	public int unlink(int nameAddress) {
 		if(nameAddress < 0)
 			return -1;
 
@@ -222,37 +222,38 @@ public class UserProcess{
 
 		int result = -1;
 		for(int index = 0; index < 15; index++){
-			if(globalFileTable[index] != null && globalFileTable[index] == file){
-				result == index;
+			if(globalFileTable[index] != null && globalFileTable[index].fileName == file){
+				result = index;
 				break;
 			}
+		}
 		if(result != -1)
 			return -1;
 
 		if(ThreadedKernel.fileSystem.remove(file))
 			return 0;
 
-		else 
-			return -1; 
+		else
+			return -1;
 	}
-	
-	Public int Syswrite(int fileDescriptor, int bufferAddress, int count){
-	
+
+	public int Syswrite(int fileDescriptor, int bufferAddress, int count){
+
 		if(count < 0)
 			return -1;
 
 		if(fileDescriptor < 0 || fileDescriptor > 15)
-			return -1; 
-
-		if(globalFileTable[fileDescriptor] == null;)
 			return -1;
-		
-		OpenFile writeFile = globalFileTable[index];
-		int bytesRemaining = count; 
-		Byte [] writing = new byte[count]; 
-		int increment = 0; 
-		int written = 0; 
-		int toWrite; 
+
+		if(localFileTable[fileDescriptor] == null)
+			return -1;
+
+		OpenFile writeFile = localFileTable[fileDescriptor];
+		int bytesRemaining = count;
+		byte [] writing = new byte[count];
+		int increment = 0;
+		int written = 0;
+		int toWrite;
 		int total = 0;
 
 		while(bytesRemaining > 0){
@@ -260,20 +261,20 @@ public class UserProcess{
 				increment = bytesRemaining; }
 			else {
 				increment = pageSize; }
-			
-			toWrite = readVirtualMemory(bufferAddress, buff, increment);
-			written = writeFile.write(buff, 0, toWrite); 
-			
 
-		if(written == -1) 
-			return -1; 
+			toWrite = readVirtualMemory(bufferAddress, writing, 0, increment);
+			written = writeFile.write(writing, 0, toWrite);
 
-		if(toWrite != written || written != increment) 
-			return -1;
 
-		total += written; 
-		bytesRemaining -= written; 
-		bufferAddress += written; 
+			if(written == -1)
+				return -1;
+
+			if(toWrite != written || written != increment)
+				return -1;
+
+			total += written;
+			bytesRemaining -= written;
+			bufferAddress += written;
 		}
 
 		return total;
