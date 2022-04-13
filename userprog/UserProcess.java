@@ -771,7 +771,8 @@ public class UserProcess{
 	//Task 1 Variables
 	private static int numProcesses = 0;
 	public int processID;
-
+	//task 2 var
+	Lock lock;
 	OpenFile[] localFileTable;
 	static FileReference[] globalFileTable;
 
@@ -793,24 +794,9 @@ public class UserProcess{
 		}
   	}
 
-    /** The program being run by this process. */
-    protected Coff coff;
 
-    /** This process's page table. */
-    protected TranslationEntry[] pageTable;
-    /** The number of contiguous pages occupied by the program. */
-    protected int numPages;
 
-    /** The number of pages in the program's stack. */
-    protected final int stackPages = 8;
     
-    private int initialPC, initialSP;
-    private int argc, argv;
-	
-    private static final int pageSize = Processor.pageSize;
-    private static final char dbgProcess = 'a';
-
-    Lock lock;
 
 
 }
