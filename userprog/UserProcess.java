@@ -4,7 +4,7 @@ import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
 import nachos.userprog.UserKernel.InsufficientFreePagesException;
-
+import java.util.LinkedList;
 import java.io.EOFException;
 
 /**
@@ -623,6 +623,117 @@ public class UserProcess{
 		return fileOpen(fileNamePointer, false);
 	}
 
+    public boolean execute(String name, String[] args) {
+		
+        if (!load(name, args))
+            return false;`
+
+		new UThread(this).setName(name).fork();
+		return true;
+    }
+
+
+    private int exit(int status) {
+		
+        int returnVal = -1;
+        exitStatus = status;
+        unloadSections();
+
+        UserProcess.runningProcesses--;
+        if (UserProcess.runningProcesses == 0) {
+            Kernel.kernel.terminate();
+        } else {
+            UThread.finish();
+        }
+
+        returnVal = 0;
+
+        return returnVal;
+    }
+
+    private int join(int procID, int statusAddr) {
+        int returnVal = -1;
+
+        if (statusAddr < 0 || statusAddr / pageSize >= numPages)
+            return returnVal;
+        else if (pageTable.length <= (statusAddr / pageSize)) {
+            return returnVal;
+        }
+
+        UserProcess childProcess = null;
+        for (UserProcess child : children) {
+            if (child.processID == procID) {
+                childProcess = child;
+                break;
+            }
+        }
+
+        if ((childProcess == null || childProcess.isJoined)) {
+            returnVal = 1;
+        } else {
+            returnVal = 0;
+        }
+
+        childProcess.isJoined = true;
+        childProcess.mainThread.join();
+
+        byte[] exitBytes = Lib.bytesFromInt(childProcess.exitStatus);
+        if (writeVirtualMemory(statusAddr, exitBytes) != 4) {
+            returnVal = 1;
+        } else {
+            returnVal = 0;
+        }
+
+        return -1;
+    }
+
+    private int exec(int fileAddr, int argc, int argvAddr) {
+        int returnVal = -1;
+
+        if (fileAddr < 0 || fileAddr / pageSize >= numPages)
+            return returnVal;
+        else if (pageTable.length <= (fileAddr / pageSize)) {
+            return returnVal;
+        }
+
+        if (argvAddr < 0 || argvAddr / pageSize >= numPages)
+            return returnVal;
+        else if (pageTable.length <= (argvAddr / pageSize)) {
+            return returnVal;
+        }
+
+        if ((0 > argc || argc >= 256))
+            return returnVal;
+
+        String filename = readVirtualMemoryString(fileAddr, 256);
+        String[] argv = new String[argc];
+
+        for (int i = 0; i < argc; ++i) {
+            byte[] currentArg = new byte[4];
+            if (!(readVirtualMemory(argvAddr + i * 4, currentArg) == 4))
+                return returnVal;
+
+            int argAddress = Lib.bytesToInt(currentArg, 0);
+
+            if (argAddress < 0 || argAddress / pageSize >= numPages)
+                return returnVal;
+            else if (pageTable.length <= (argAddress / pageSize)) {
+                return returnVal;
+            }
+            argv[i] = readVirtualMemoryString(argAddress, 256);
+        }
+
+        UserProcess child = new UserProcess();
+        children.add(child);
+
+        if (!child.execute(filename, argv))
+            returnVal = -1;
+        else
+            returnVal = child.prreturocessID;
+
+        return returnVal;
+    }
+  
 	/**
 	 * Method to handle the create system call. Uses the fileOpen method
 	 */
@@ -751,6 +862,7 @@ public class UserProcess{
 		}
 	}
 
+
 	/** The program being run by this process. */
 	protected Coff coff;
 
@@ -771,11 +883,20 @@ public class UserProcess{
 	//Task 1 Variables
 	private static int numProcesses = 0;
 	public int processID;
+  
+  OpenFile[] localFileTable;
+	static FileReference[] globalFileTable;
 	//task 2 var
 	Lock lock;
-	OpenFile[] localFileTable;
-	static FileReference[] globalFileTable;
-
+  //Task 3 var
+  private int processID;
+  private int exitStatus = 0;
+  private static int runningProcesses = 0;
+  private UThread mainThread = null;
+  private LinkedList<UserProcess> children = new LinkedList<>();
+  public boolean isJoined = false;
+  
+  //Task 1 nested class
 	public class FileReference{
 		//integer tracking the number of references to the file
 		public int numReferences;
@@ -792,11 +913,5 @@ public class UserProcess{
 			markedForDeath = false;
 			fileName = inFileName;
 		}
-  	}
-
-
-
-    
-
-
+  }
 }
