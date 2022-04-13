@@ -1,5 +1,7 @@
 package nachos.userprog;
 
+import java.util.LinkedList;
+
 import nachos.machine.*;
 import nachos.threads.*;
 import nachos.userprog.*;
@@ -8,11 +10,19 @@ import nachos.userprog.*;
  * A kernel that can support multiple user processes.
  */
 public class UserKernel extends ThreadedKernel {
+
+    public LinkedList<TranslationEntry> freePage;
+    public Lock lock;
+
     /**
      * Allocate a new user kernel.
      */
     public UserKernel() {
-	super();
+        super();
+
+        freePage= new LinkedList<TranslationEntry>();
+
+	
     }
 
     /**
@@ -27,6 +37,14 @@ public class UserKernel extends ThreadedKernel {
 	Machine.processor().setExceptionHandler(new Runnable() {
 		public void run() { exceptionHandler(); }
 	    });
+
+        //get number of pages available
+        int pageNum = Machine.processor().getNumPhysPages();
+        for(int i=0; i<pageNum; ++i)
+        	freePage.add(new TranslationEntry(0, i, false, false, false, false));
+		
+		//Initialize the pageLock
+		lock = new Lock();
     }
 
     /**
@@ -35,6 +53,13 @@ public class UserKernel extends ThreadedKernel {
     public void selfTest() {
 	super.selfTest();
 
+	
+	UserProcess userProcessTest = null;	
+	if(Lib.test(vmTestChar)){
+		userProcessTest = new UserProcess();
+		userProcessTest.selfTest();
+	}
+	
 	System.out.println("Testing the console device. Typed characters");
 	System.out.println("will be echoed until q is typed.");
 
@@ -107,9 +132,51 @@ public class UserKernel extends ThreadedKernel {
 	super.terminate();
     }
 
+    public TranslationEntry[] getPages(int amount) throws InsufficientFreePagesException{
+    	//Acquire the lock
+    	lock.acquire();
+    	
+    	//If there are enough pages left to accomodate the request
+    	if(!freePage.isEmpty() && freePage.size() >= amount){
+    		//Create a new array of the requested pages
+    		TranslationEntry[] requestedPages = new TranslationEntry[amount];
+    		
+    		//Cycle through the pages to remove them from the free pages and validate them
+    		for(int i=0; i<requestedPages.length; ++i){
+    			requestedPages[i] = freePage.remove();
+    			requestedPages[i].valid = true;
+    		}
+    		
+    		//Release the lock and return the requested pages
+    		lock.release();
+    		return requestedPages;
+    	}
+    	//If there are not enough pages left to accomodate the reques
+    	else{
+    		//Release the lock and throw an InsufficientFreePagesException
+    		lock.release();
+    		throw new InsufficientFreePagesException();
+    	}
+    }
+
+    public void releasePageTable(TranslationEntry[] pageTable){
+    	lock.acquire();
+    	
+    	for(int i=0; i<pageTable.length; ++i){
+    		pageTable[i].valid = false;
+    		freePage.add(pageTable[i]);
+    	}
+    	
+    	lock.release();
+    }
+    
+    
+    public class InsufficientFreePagesException extends Exception{}
     /** Globally accessible reference to the synchronized console. */
     public static SynchConsole console;
 
     // dummy variables to make javac smarter
     private static Coff dummy1 = null;
+    
+    public static final char vmTestChar = 'j';
 }
