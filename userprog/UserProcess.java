@@ -246,7 +246,8 @@ public class UserProcess{
 
 		if(globalFileTable[fileDescriptor] == null;)
 			return -1;
-
+		
+		OpenFile writeFile = globalFileTable[index];
 		int bytesRemaining = count; 
 		Byte [] writing = new byte[count]; 
 		int increment = 0; 
@@ -261,7 +262,7 @@ public class UserProcess{
 				increment = pageSize; }
 			
 			toWrite = readVirtualMemory(bufferAddress, buff, increment);
-			rritten = writeFile.write(buff, 0, toWrite); 
+			written = writeFile.write(buff, 0, toWrite); 
 			
 
 		if(written == -1) 
