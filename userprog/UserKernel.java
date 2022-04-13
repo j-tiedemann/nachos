@@ -34,6 +34,11 @@ public class UserKernel extends ThreadedKernel {
      */	
     public void selfTest() {
 	super.selfTest();
+	UserProcess testProcess = null;
+	if(Lib.test(vmTestChar)){
+		testProcess = new UserProcess();
+		testProcess.selfTest();
+	}
 
 	System.out.println("Testing the console device. Typed characters");
 	System.out.println("will be echoed until q is typed.");
