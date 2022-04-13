@@ -804,24 +804,13 @@ public class UserProcess{
 
 	/**
 	 * Ensure that a memory address is valid. The address must be within defined memory.
-	 * If it is is an invalid location handleExit is called with an exit code -1.
+	 * If it is is an invalid location exit is called with an exit code -1.
 	 * @param address the address to be verified
 	 */
 	private void addressChecker(int address) {
 		int pageNum = Processor.pageFromAddress(address);
 		if(pageNum >= numPages || pageNum < 0)
-			handleExit(-1);
-	}
-
-	/**
-	 * Handles the exit system call by acquiring the joinLock. Notifies the parent that the child is going to exit
-	 * if the parent exists to avoid it from joining later. Will disown each child by making the child's parent null.
-	 * It then opens the files and closes them to release any referances to them using the handleClose method and wake
-	 * up any processes that may be assleep using waitingToJoin condition. unloadSections is then used to release the
-	 * virtual memory, finally releasing the lock
-	 * @param i
-	 */
-	private void handleExit(int i) {
+			exit(-1);
 	}
 
 	/**
