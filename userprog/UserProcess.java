@@ -623,14 +623,6 @@ public class UserProcess{
 		return fileOpen(fileNamePointer, false);
 	}
 
-    public boolean execute(String name, String[] args) {
-		
-        if (!load(name, args))
-            return false;`
-
-		new UThread(this).setName(name).fork();
-		return true;
-    }
 
 
     private int exit(int status) {
@@ -729,7 +721,7 @@ public class UserProcess{
         if (!child.execute(filename, argv))
             returnVal = -1;
         else
-            returnVal = child.prreturocessID;
+            returnVal = child.processID;
 
         return returnVal;
     }
@@ -888,12 +880,13 @@ public class UserProcess{
 	static FileReference[] globalFileTable;
 	//task 2 var
 	Lock lock;
-  //Task 3 var
-  private int processID;
+ 
+	//Task 3 var
+  
   private int exitStatus = 0;
   private static int runningProcesses = 0;
   private UThread mainThread = null;
-  private LinkedList<UserProcess> children = new LinkedList<>();
+  private LinkedList<UserProcess> children = new LinkedList<UserProcess>();
   public boolean isJoined = false;
   
   //Task 1 nested class
