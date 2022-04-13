@@ -211,6 +211,31 @@ public class UserProcess{
 		}
 		Return 0; 
 	}
+	
+	Public int unlink(int nameAddress) {
+		if(nameAddress < 0)
+			Return -1;
+
+		String file = readVirtualMemoryString(nameAddress, 256);
+		if(file == null)
+		Return -1;
+
+		Int result = -1;
+		for(int index = 0; index < listMax; index++){
+			if(globalFileTable[index] != null && globalFileTable[index] == file){
+				Result == index;
+				Break;
+			}
+		if(result != -1)
+			Return -1;
+
+		if(ThreadKernel.fileSystem.remove(file))
+			Return 0;
+
+		Else 
+			Return -1; 
+	}
+
 
 
 	/**
