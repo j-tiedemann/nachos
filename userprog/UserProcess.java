@@ -229,7 +229,7 @@ public class UserProcess{
 		if(result != -1)
 			return -1;
 
-		if(ThreadKernel.fileSystem.remove(file))
+		if(ThreadedKernel.fileSystem.remove(file))
 			return 0;
 
 		else 
@@ -261,13 +261,13 @@ public class UserProcess{
 				increment = pageSize; }
 			
 			toWrite = readVirtualMemory(bufferAddress, buff, increment);
-			Written = writeFile.write(buff, 0, toWrite); 
+			rritten = writeFile.write(buff, 0, toWrite); 
 			
 
 		if(written == -1) 
 			return -1; 
 
-		if(toWrite != Written || Written != increment) 
+		if(toWrite != written || written != increment) 
 			return -1;
 
 		total += written; 
