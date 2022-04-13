@@ -196,6 +196,22 @@ public class UserProcess{
 
 		return amount;
 	}
+	
+	Public int sysClose(int fileDescriptor){
+
+		if(fileDescriptor < 0 || fileDescriptor > 15)
+			Return -1; 
+
+		if(fileList[fileDescriptor] == null)
+			Return -1; 
+
+		Else {
+			globalFileTable[fileDescriptor].close();
+			globalFileTable[fileDescriptor] = null;
+		}
+		Return 0; 
+	}
+
 
 	/**
 	 * Load the executable with the specified name into this process, and
