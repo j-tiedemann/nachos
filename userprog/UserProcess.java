@@ -202,7 +202,7 @@ public class UserProcess{
 		if(fileDescriptor < 0 || fileDescriptor > 15)
 			Return -1; 
 
-		if(fileList[fileDescriptor] == null)
+		if(globalFileTable[fileDescriptor] == null)
 			Return -1; 
 
 		Else {
